@@ -144,6 +144,14 @@ is `K=2`; change `env.taskset.task.tools.reward_precision` to set another target
 The requested precision appears in the agent's prompt and grading record.
 The scientific energy score is retained separately from reward.
 
+Energy scores and marginal CRPS use the fair (unbiased) ensemble estimator:
+forecast spread is averaged over distinct member pairs, so it needs at least
+two members. Score reports record the `estimator`. Passing `estimator="plugin"`
+to `blobround6_eval.score_case` reproduces earlier scores, which also counted
+each member paired with itself and so read higher by `E|X-X'|/(2m)` for `m`
+members. Bundles bind the scorer source hash, so bundles sealed against the
+earlier scorer must be resealed before they load for grading.
+
 The supplied configs allow 1,000 experiments, 50,000 simulated time units,
 128 validations and submissions, 1,024 model turns, and a 24-hour rollout.
 These are configurable; tool-budget fields accept `null` in JSON for unlimited

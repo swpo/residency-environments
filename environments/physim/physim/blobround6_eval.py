@@ -23,6 +23,15 @@ from . import blobround6 as R6
 
 VERSION = "r6-offline-score-v1"
 BUNDLE_VERSION = "r6-prediction-bundle-v2"
+# Ensemble spread estimators. "fair" averages member distances over the m*(m-1)
+# ordered pairs with i != j and is unbiased for any m >= 2 members. "plugin"
+# reproduces the original mean over all m*m ordered pairs, including the zero
+# i = j terms, which overstates the score by E|X - X'| / (2m).
+ESTIMATORS = ("fair", "plugin")
+SCORING_CONVENTIONS = {
+    "fair": "empirical distribution, fair spread over distinct member pairs, independent truths",
+    "plugin": "empirical distribution, ordered pairs including self, independent truths",
+}
 
 
 class EvaluationError(ValueError):
@@ -249,9 +258,21 @@ def validate_samples(payload, shapes, n_members, *, label="prediction"):
     return result
 
 
-def _marginal_crps(pred, truth):
+def _spread_pairs(m, estimator):
+    """Number of ordered member pairs the spread term averages over."""
+    if type(estimator) is not str or estimator not in ESTIMATORS:
+        raise EvaluationError(f"estimator must be one of {list(ESTIMATORS)}")
+    if estimator == "plugin":
+        return m * m
+    if m < 2:
+        raise EvaluationError("the fair estimator requires at least two prediction members")
+    return m * (m - 1)
+
+
+def _marginal_crps(pred, truth, estimator="fair"):
     """Empirical-distribution CRPS, averaged over independent truth observations."""
     m, n = len(pred), len(truth)
+    pairs = _spread_pairs(m, estimator)
     x, y = pred.reshape(m, -1), truth.reshape(n, -1)
     cross = np.zeros(x.shape[1], dtype=np.float64)
     # One observation at a time avoids M*N*coordinates temporary storage.
@@ -259,8 +280,9 @@ def _marginal_crps(pred, truth):
         cross += np.abs(x - observation).mean(axis=0) / n
     ordered = np.sort(x, axis=0)
     weights = (2 * np.arange(m, dtype=float) - m + 1)[:, None]
-    # Exactly half the mean distance over all ordered pairs, including i=j.
-    half_self = (weights * ordered).sum(axis=0) / (m * m)
+    # The weighted sum is half the total distance over ordered pairs, so this is
+    # half the mean over i != j (fair) or over all pairs including i=j (plugin).
+    half_self = (weights * ordered).sum(axis=0) / pairs
     return (cross - half_self).reshape(pred.shape[1:])
 
 
@@ -274,27 +296,33 @@ def _mean_rms_distance(x, y):
     return total
 
 
-def _energy_score(pred, truth):
-    return _mean_rms_distance(pred, truth) - 0.5 * _mean_rms_distance(pred, pred)
+def _energy_score(pred, truth, estimator="fair"):
+    m = len(pred)
+    # The pred-pred mean covers all m*m pairs; its i=j terms are zero.
+    spread_weight = m * m / _spread_pairs(m, estimator)
+    return _mean_rms_distance(pred, truth) - 0.5 * spread_weight * _mean_rms_distance(pred, pred)
 
 
 def score_case(case, prediction, truth, *, groups, n_samples=64, n_truth=4,
-               roster=DEFAULT_ROSTER, limits=DEFAULT_LIMITS):
+               roster=DEFAULT_ROSTER, limits=DEFAULT_LIMITS, estimator="fair"):
     """Score empirical distributions; prediction/truth member counts may differ.
 
     CRPS is in each observable's native units. Energy uses coordinate / scale
     and an RMS Euclidean norm, so every group score is dimensionless. Group
     average weights the predeclared groups equally; it is not a 0--1 score.
+    The default "fair" estimator needs n_samples >= 2; "plugin" reproduces the
+    original scores, which include zero self-pairs in the ensemble spread.
     """
     plan = validate_plan(case, groups=groups, n_samples=n_samples, n_truth=n_truth,
                          roster=roster, limits=limits)
+    _spread_pairs(n_samples, estimator)
     pred = validate_samples(prediction, plan["shapes"], n_samples)
     observed = validate_samples(truth, plan["shapes"], n_truth, label="truth")
     marginal = []
     joints = []
     with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
         for qi, (query, x, y) in enumerate(zip(case["queries"], pred, observed)):
-            values = _marginal_crps(x, y)
+            values = _marginal_crps(x, y, estimator)
             if not len(query["t"]):
                 reduced = None
             else:
@@ -309,7 +337,7 @@ def score_case(case, prediction, truth, *, groups, n_samples=64, n_truth=4,
             def select(arrays):
                 return np.column_stack([arrays[s["query"]][:, s["time_index"], s["port"], s["slot"]]
                                         for s in group["selectors"]]) / np.asarray(group["scales"])
-            value = _energy_score(select(pred), select(observed))
+            value = _energy_score(select(pred), select(observed), estimator)
             joints.append({"id": group["id"], "energy_score": value,
                            "unit": "dimensionless", "coordinate_unit": group["unit"],
                            "scales": deepcopy(group["scales"]),
@@ -321,7 +349,7 @@ def score_case(case, prediction, truth, *, groups, n_samples=64, n_truth=4,
               "marginal_crps": marginal, "joint_energy": joints,
               "joint_energy_equal_group_mean": aggregate,
               "joint_aggregate_unit": "dimensionless", "work_estimate": plan["pairwise_work"],
-              "scoring_convention": "empirical distribution, ordered pairs including self, independent truths"}
+              "estimator": estimator, "scoring_convention": SCORING_CONVENTIONS[estimator]}
     try:
         json.dumps(report, allow_nan=False)
     except (ValueError, OverflowError):
@@ -332,7 +360,7 @@ def score_case(case, prediction, truth, *, groups, n_samples=64, n_truth=4,
 def evaluate_trusted_predictor(predictor, truth_sampler, case, *, groups,
                                n_samples=64, n_truth=4, predictor_seed=0,
                                truth_seed=None, roster=DEFAULT_ROSTER,
-                               limits=DEFAULT_LIMITS):
+                               limits=DEFAULT_LIMITS, estimator="fair"):
     """Reviewed local adapters ONLY; no submitted-code isolation is provided.
 
     ``truth_sampler`` is privileged and exposes sample_truth(..., truth_seed=).
@@ -342,6 +370,7 @@ def evaluate_trusted_predictor(predictor, truth_sampler, case, *, groups,
     """
     plan = validate_plan(case, groups=groups, n_samples=n_samples, n_truth=n_truth,
                          roster=roster, limits=limits)
+    _spread_pairs(n_samples, estimator)
     _int(predictor_seed, "predictor_seed", 0, R6.MAX_SEED)
     if truth_seed is None:
         truth_seed = secrets.randbits(64)
@@ -353,7 +382,8 @@ def evaluate_trusted_predictor(predictor, truth_sampler, case, *, groups,
     truth = truth_sampler.sample_truth(deepcopy(case["actions"]), deepcopy(case["queries"]),
                                       n_samples=n_truth, truth_seed=truth_seed)
     return score_case(case, {"samples": pred}, truth, groups=groups,
-                      n_samples=n_samples, n_truth=n_truth, roster=roster, limits=limits)
+                      n_samples=n_samples, n_truth=n_truth, roster=roster, limits=limits,
+                      estimator=estimator)
 
 
 def _reject_constant(value):
@@ -466,6 +496,8 @@ def main(argv=None):
     parser.add_argument("--device-slots", type=int, nargs="+", default=[13, 19])
     parser.add_argument("--max-horizon-tu", type=float, default=DEFAULT_LIMITS.max_horizon_tu,
                         help="explicit world horizon; worked example requires 50")
+    parser.add_argument("--estimator", choices=ESTIMATORS, default="fair",
+                        help="ensemble spread estimator; plugin reproduces original scores")
     parser.add_argument("--out", required=True)
     args = parser.parse_args(argv)
     roster = PublicRoster(args.n_ports, tuple(args.device_slots))
@@ -473,11 +505,13 @@ def main(argv=None):
     case, groups = read_json_data(args.case, limits=limits), read_json_data(args.groups, limits=limits)
     validate_plan(case, groups=groups, n_samples=args.n_samples, n_truth=args.n_truth,
                   roster=roster, limits=limits)
+    _spread_pairs(args.n_samples, args.estimator)
     prediction = read_sample_bundle(args.prediction, case, n_members=args.n_samples,
                                     roster=roster, limits=limits)
     truth = read_sample_bundle(args.truth, case, n_members=args.n_truth, roster=roster, limits=limits)
     report = score_case(case, prediction, truth, groups=groups,
-                        n_samples=args.n_samples, n_truth=args.n_truth, roster=roster, limits=limits)
+                        n_samples=args.n_samples, n_truth=args.n_truth, roster=roster, limits=limits,
+                        estimator=args.estimator)
     Path(args.out).write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
     return 0
 
