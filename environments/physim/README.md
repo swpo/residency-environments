@@ -31,7 +31,7 @@ the open PR's branch. Use an upstream released version once it includes these fi
 
 The default taskset contains **BF, p4g2_044, and XV**, one task per evaluation
 preparation in the catalog at pinned HF commit
-`bd77a0da2f14eef352bd80c4a38dff426e5c1bed`. Superseded preparations are absent
+`94d64446dfc8e1660da863e11c6d895e265f4a80`. Superseded preparations are absent
 from this snapshot. Each task is a complete investigation and submission, graded
 on that preparation's retained suite. `-n` limits the number of tasks; `-r`
 repeats each selected task. For example, `-r 3` runs nine investigations, three
