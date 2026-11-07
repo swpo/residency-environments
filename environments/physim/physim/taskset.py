@@ -34,7 +34,7 @@ PROTOCOL = f"r6-verifiers-v1-bash-1-{PROMPT_CONDITION}"
 AGENT_IMAGE = PUBLIC_IMAGE
 DEFAULT_CATALOG = dict(
     repo="seanpohorence/physim-worlds",
-    revision="bd77a0da2f14eef352bd80c4a38dff426e5c1bed",
+    revision="94d64446dfc8e1660da863e11c6d895e265f4a80",
 )
 DEFAULT_OUTPUT = Path("outputs/r6/artifacts")
 DEFAULT_PROMPT = "Investigate the laboratory and submit your executable predictor."

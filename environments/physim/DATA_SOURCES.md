@@ -5,9 +5,11 @@ the genome, exact prepared fields, apparatus, case programs, score groups, and
 retained native realizations. License choices are recorded in
 `configs/physim/release.toml` and in each data-bundle manifest.
 
-The [published dataset](https://huggingface.co/datasets/seanpohorence/physim-worlds/tree/bd77a0da2f14eef352bd80c4a38dff426e5c1bed) is `seanpohorence/physim-worlds`, verified at
-`bd77a0da2f14eef352bd80c4a38dff426e5c1bed`. It includes the preserved registry and
-three current centered-apparatus evaluation preparations. Superseded preparations
+The [published dataset](https://huggingface.co/datasets/seanpohorence/physim-worlds/tree/94d64446dfc8e1660da863e11c6d895e265f4a80) is `seanpohorence/physim-worlds`, verified at
+`94d64446dfc8e1660da863e11c6d895e265f4a80`. It includes the preserved registry and
+three current centered-apparatus evaluation preparations, sealed for the fair
+ensemble scorer (`blobround6_eval.py` sha256 9deb1738; the November 7 release). Bundles
+released at earlier revisions bind the earlier scorer and are refused by this code. Superseded preparations
 have been removed from the current catalog and file tree.
 The taskset defaults to all evaluation preparations in this pinned catalog,
 one task per preparation. Explicit bundle selection restricts it to one task or
@@ -17,7 +19,7 @@ To discover the runnable evaluation preparations from the installed package:
 
 ```sh
 physim catalog --repo seanpohorence/physim-worlds \
-  --revision bd77a0da2f14eef352bd80c4a38dff426e5c1bed
+  --revision 94d64446dfc8e1660da863e11c6d895e265f4a80
 ```
 
 This command reads `catalog.jsonl`, which lists evaluation bundles only. The HF

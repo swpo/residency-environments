@@ -2,7 +2,7 @@
 
 `eval.toml` runs all three preparations in the pinned evaluation catalog by default.
 `bf_trail_lab.toml`, `xv_rotor_lab.toml`, and `p4g2_044.toml` select one current
-preparation explicitly at HF commit `bd77a0da2f14eef352bd80c4a38dff426e5c1bed`.
+preparation explicitly at HF commit `94d64446dfc8e1660da863e11c6d895e265f4a80`.
 All use the stock Bash harness and Prime runtimes, with generous investigation
 limits. Override `model` on the CLI. `-r 3` repeats each selected preparation three
 times; with the default catalog this runs nine investigations. `-n` limits the

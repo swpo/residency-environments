@@ -48,5 +48,5 @@ max_retries = 0
 
 [env.taskset.task.tools.bundle_source]
 repo = "seanpohorence/physim-worlds"
-revision = "bd77a0da2f14eef352bd80c4a38dff426e5c1bed"
-path = "bundles/xv_rotor_lab_centered_v2/440472fb5868d80d7a94cdb74f615ea1525a71b3387147ab394059f815b37bf6"
+revision = "94d64446dfc8e1660da863e11c6d895e265f4a80"
+path = "bundles/xv_rotor_lab_centered_v2/5119c0ef63309b0f73f909871133022520065fb791e68589a659a608369b5820"
