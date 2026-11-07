@@ -139,10 +139,12 @@ class LabWorld:
         object.__setattr__(self, "noise_intensity", intensity)
         for f, b in self.noise_bounds.items():
             ok = f in self.noise and isinstance(b, (tuple, list)) and len(b) == 2
-            lo, hi = (b if ok else (None, None))
+            lo, hi = b if ok else (None, None)
             ok = ok and all(v is None or (not isinstance(v, bool) and np.isfinite(v)) for v in (lo, hi))
             if not ok or (lo is not None and hi is not None and not lo < hi) or (lo is None and hi is None):
-                raise ValueError(f"noise bounds for {f!r} must name a field with a declared noise and be (lo, hi), lo < hi")
+                raise ValueError(
+                    f"noise bounds for {f!r} must name a field with a declared noise and be (lo, hi), lo < hi"
+                )
         object.__setattr__(self, "noise_bounds", {f: tuple(b) for f, b in self.noise_bounds.items()})
         derived = tuple(self.derived)
         names = [d.name for d in derived]

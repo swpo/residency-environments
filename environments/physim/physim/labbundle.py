@@ -59,8 +59,22 @@ from .bundles import (
 LAB_FORMAT = "physim-lab-bundle-v1"
 SIMULATION_FILES = ("labworld.json", "apparatus.json", "preparation.npz")
 DECLARATION_KEYS = {
-    "name", "world_file", "fields", "steps_per_tick", "native_dt", "ports", "noise", "noise_corr",
-    "noise_intensity", "overrides", "dx", "carry", "actuators", "derived", "fft_workers", "grid",
+    "name",
+    "world_file",
+    "fields",
+    "steps_per_tick",
+    "native_dt",
+    "ports",
+    "noise",
+    "noise_corr",
+    "noise_intensity",
+    "overrides",
+    "dx",
+    "carry",
+    "actuators",
+    "derived",
+    "fft_workers",
+    "grid",
 }
 REFERENCE_DEPENDENCIES = ("numpy", "scipy")
 
@@ -107,9 +121,7 @@ def world_from_declaration(decl: dict, root: Path) -> LW.LabWorld:
     if type(decl) is not dict or set(decl) != DECLARATION_KEYS:
         raise BundleError("lab world declaration keys differ from the supported set")
     root = Path(root)
-    derived = tuple(
-        LW.Derived(d["name"], _load_function(root, d["source"], d["function"])) for d in decl["derived"]
-    )
+    derived = tuple(LW.Derived(d["name"], _load_function(root, d["source"], d["function"])) for d in decl["derived"])
     try:
         return LW.LabWorld(
             path=str(root / "world" / relative_path(decl["world_file"])),
@@ -188,7 +200,10 @@ def validate_lab_manifest(manifest):
     if set(objects) != {"world", "preparation", "suite"}:
         raise BundleError("invalid bundle object inventory")
     for kind, obj in objects.items():
-        if type(obj) is not dict or obj.get("id") != identified(kind, {k: v for k, v in obj.items() if k != "id"})["id"]:
+        if (
+            type(obj) is not dict
+            or obj.get("id") != identified(kind, {k: v for k, v in obj.items() if k != "id"})["id"]
+        ):
             raise BundleError(f"{kind} identity mismatch")
     if (
         objects["preparation"].get("world_id") != objects["world"]["id"]
@@ -209,15 +224,21 @@ def validate_lab_manifest(manifest):
         names.add(name)
         if type(record["bytes"]) is not int or record["bytes"] < 0:
             raise BundleError("invalid file size")
-        if type(record["profiles"]) is not list or not record["profiles"] or any(p not in PROFILES for p in record["profiles"]):
+        if (
+            type(record["profiles"]) is not list
+            or not record["profiles"]
+            or any(p not in PROFILES for p in record["profiles"])
+        ):
             raise BundleError("invalid download profile")
         total += record["bytes"]
     if total > MAX_TOTAL:
         raise BundleError("bundle exceeds supported byte limit")
     by_path = {r["path"]: r for r in files}
     world_files = objects["world"].get("files")
-    if type(world_files) is not dict or not world_files or any(
-        by_path.get(p, {}).get("sha256") != h or by_path[p]["role"] != "world" for p, h in world_files.items()
+    if (
+        type(world_files) is not dict
+        or not world_files
+        or any(by_path.get(p, {}).get("sha256") != h or by_path[p]["role"] != "world" for p, h in world_files.items())
     ):
         raise BundleError("world identity does not bind its files")
     if {p for p, r in by_path.items() if r["role"] == "world"} != set(world_files):
@@ -231,7 +252,11 @@ def validate_lab_manifest(manifest):
         if name not in by_path or objects[obj].get(key) != by_path[name]["sha256"]:
             raise BundleError("object identity does not bind its declared file")
     truths = objects["suite"].get("truth_sha256")
-    if type(truths) is not dict or not truths or truths != {r["path"]: r["sha256"] for r in files if r["role"] == "truth"}:
+    if (
+        type(truths) is not dict
+        or not truths
+        or truths != {r["path"]: r["sha256"] for r in files if r["role"] == "truth"}
+    ):
         raise BundleError("suite identity does not bind every truth file")
     for name in (*SIMULATION_FILES, *world_files):
         if set(by_path[name]["profiles"]) != set(PROFILES):
@@ -289,7 +314,13 @@ class LabBundle(Bundle):
         prep = self.manifest["objects"]["preparation"]
         if prep.get("noise_policy") != R6.NOISE_POLICY or prep.get("public_time") != 0:
             raise BundleError("unsupported preparation profile")
-        if type(a) is not dict or set(a) != {"devices", "device_slots", "port_permutation", "adjustment_matrix", "protocol"}:
+        if type(a) is not dict or set(a) != {
+            "devices",
+            "device_slots",
+            "port_permutation",
+            "adjustment_matrix",
+            "protocol",
+        }:
             raise BundleError("invalid reference apparatus")
         self.protocol = a["protocol"]
         if self.protocol != R6.APPARATUS_PROTOCOL or a["device_slots"] != [13, 19] or len(a["devices"]) != 2:
@@ -314,7 +345,10 @@ class LabBundle(Bundle):
         for name in self.manifest["objects"]["world"]["files"]:
             self.verified_path(name)
         state = self.state()
-        if state_digest({k: np.asarray(v) for k, v in state.items()}) != self.manifest["objects"]["preparation"]["state_sha256"]:
+        if (
+            state_digest({k: np.asarray(v) for k, v in state.items()})
+            != self.manifest["objects"]["preparation"]["state_sha256"]
+        ):
             raise BundleError("prepared state identity mismatch")
         return build_oracle(self.root, self.declaration, self.apparatus, state, world=world, devices=devices)
 
