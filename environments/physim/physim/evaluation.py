@@ -20,6 +20,8 @@ from .runtime_sandbox import RuntimeSandbox as Sandbox
 from .sandbox import ExecutionLimits, SandboxError, SandboxInfrastructureError
 
 LIMITS = replace(E.DEFAULT_LIMITS, max_horizon_tu=50.0)
+# Unbiased ensemble spread (distinct member pairs); "plugin" is for reproducing old scores only.
+SCORING_ESTIMATOR = "fair"
 
 SUBMISSION_GATE_VERSION = "r6-gate-public-validation-v3-interface"
 
@@ -202,6 +204,7 @@ def score_frozen(bundle, output, saved, failures, *, members, predictor):
             n_truth=2,
             roster=bundle.roster,
             limits=bundle.limits,
+            estimator=SCORING_ESTIMATOR,
         )
         marginals = [np.asarray(q["crps_by_port_slot_mean_over_times"]) for q in score["marginal_crps"]]
         weights = [a.size * len(q["t"]) for a, q in zip(marginals, case["queries"])]
@@ -225,6 +228,7 @@ def score_frozen(bundle, output, saved, failures, *, members, predictor):
         results=results,
         forecast_members=members,
         truth_members=2,
+        scoring_estimator=SCORING_ESTIMATOR,
         truth_policy="Retained independent native realizations; no truth/predictor seed pairing.",
         references=bundle.references(),
         predictor=predictor,
