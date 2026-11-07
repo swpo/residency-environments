@@ -1,7 +1,13 @@
-"""PhySim ensemble scores: the fair estimator is unbiased and "plugin" reproduces the original scores.
+"""Manual check of the PhySim ensemble scores (not part of CI).
 
-These checks need the physim package in the test environment (from the repository root:
-``uv pip install -e ./environments/physim``); they are skipped when it is not installed.
+The fair estimator is unbiased and "plugin" reproduces the original scores bit for bit.
+The repository keeps per-environment unit tests out of ``tests/`` (AGENTS.md), so this
+lives here and is run by hand from the repository root:
+
+    uv pip install -e ./environments/physim pytest
+    pytest scripts/physim/check_scoring.py
+
+The bit-identity checks need the full git history (the pre-fair scorer blobs).
 """
 
 import importlib.util
@@ -16,7 +22,7 @@ np = pytest.importorskip("numpy")
 current = pytest.importorskip("physim.blobround6_eval")
 legacy = pytest.importorskip("physim.legacy_v1.blobround6_eval")
 
-ROOT = Path(__file__).parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 # Git blob ids of both scorer modules before the fair estimator (upstream/main at 5149b69).
 PRE_FAIR_BLOBS = {
     "physim.blobround6_eval": "03219556fc95235b6a93d331f01bda281cc2beef",
@@ -289,3 +295,50 @@ def test_unknown_estimator_is_rejected(scorer, estimator):
             predictor, SeededTruth(), CASE, groups=GROUPS, n_samples=4, n_truth=2, estimator=estimator
         )
     assert predictor.calls == 0
+
+
+def test_grading_uses_and_records_the_fair_estimator():
+    evaluation = pytest.importorskip("physim.evaluation")
+    assert evaluation.SCORING_ESTIMATOR == "fair"
+    source = Path(evaluation.__file__).read_text()
+    assert "estimator=SCORING_ESTIMATOR" in source and "scoring_estimator=SCORING_ESTIMATOR" in source
+
+
+@SCORERS
+@pytest.mark.parametrize("estimator", ["fair", "plugin"])
+def test_cli_passes_the_estimator_through(scorer, estimator, monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_score_case(*args, **kwargs):
+        seen["estimator"] = kwargs.get("estimator")
+        return {"ok": True}
+
+    monkeypatch.setattr(scorer, "validate_plan", lambda *a, **k: None)
+    monkeypatch.setattr(scorer, "read_json_data", lambda *a, **k: {})
+    monkeypatch.setattr(scorer, "read_sample_bundle", lambda *a, **k: {})
+    monkeypatch.setattr(scorer, "score_case", fake_score_case)
+    out = tmp_path / "report.json"
+    argv = [
+        "--case",
+        "c",
+        "--groups",
+        "g",
+        "--prediction",
+        "p",
+        "--truth",
+        "t",
+        "--out",
+        str(out),
+        "--estimator",
+        estimator,
+    ]
+    assert scorer.main(argv) == 0
+    assert seen["estimator"] == estimator
+
+
+def test_precision_reward_treats_rounding_level_negatives_as_zero():
+    rewards = pytest.importorskip("physim.rewards")
+    assert rewards.precision_reward(-4.4e-16) == 1.0
+    assert rewards.precision_reward(0.0) == 1.0
+    with pytest.raises(ValueError):
+        rewards.precision_reward(-1e-6)
