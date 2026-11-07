@@ -326,6 +326,16 @@ invalidates it until its manifest is rewritten.
   charged; a port-4 request is rejected without charge); two truths re-simulate bit for bit; initial
   persistence reproduces checks.json through `evaluation.reference_demo`.
 
+## Scoring estimator (7 Nov)
+
+Every score above used the earlier `blobround6_eval` estimator, which averaged the ensemble spread over
+all ordered member pairs including each member with itself. That overstates a score by `E|X-X'|/(2m)` for
+`m` members: material for the 4- and 8-member controls and slices, small for the 64-member reference.
+`score_case` now defaults to the fair estimator (distinct pairs only, unbiased for `m >= 2`);
+`estimator="plugin"` reproduces the numbers above. Deterministic predictors such as initial persistence
+have zero spread, so their energy scores are unchanged. Lab bundles bind the scorer's hash in their
+implementation identity, so the fed-vortex bundle must be resealed before it loads again.
+
 ## Open questions
 
 - Whether to keep raw Python steppers or widen Blobkit's genome into a term list for field worlds
